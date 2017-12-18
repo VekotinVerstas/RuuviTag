@@ -1,0 +1,7 @@
+[DEFAULT]
+timeout = 4
+
+[influxdb]
+host = 127.0.0.1
+port = 8086
+db = ruuvitag
