@@ -1,8 +1,12 @@
 import sys
+import os
 import datetime
 import time
 import json
 import configparser
+import argparse
+import paho.mqtt.client as mqtt
+
 from ruuvitag_sensor.ruuvi import RuuviTagSensor
 from influxdb import InfluxDBClient
 
@@ -31,6 +35,12 @@ EXAMPLE_DATA = {
 }
 
 
+def on_connect(client, userdata, flags, rc):
+    print("Connected with result code {}".format(rc))
+    # Subscribing in on_connect() means that if we lose the connection and
+    # reconnect then subscriptions will be renewed.
+    client.subscribe("#")
+
 
 def get_iclient(host, port, db):
     # using Http
@@ -38,28 +48,39 @@ def get_iclient(host, port, db):
     return iclient
 
 
-def send_data2influxdb(d, simulate=False):
+def create_influxdb_packet(d):
     ts = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
     json_data = []
+    meas = 'ruuvitag'
     for tag in d:
         tag_data = d[tag]
-        meas = 'ruuvi-{}'.format(tag)
         json_body = {
             "measurement": meas,
             "tags": {
                 "dev-id": tag,
-                "sensor": 'ruuvi',
             },
             "time": ts,
             "fields": {}
         }
         json_body['fields'] = tag_data
         json_data.append(json_body)
+    return json_data
+
+
+def http_post2influxdb(d, simulate=False):
+    json_data = create_influxdb_packet(d)
     # print(json_data)
     if simulate is False and json_data:
         iclient.write_points(json_data)
     return
 
+
+def mqtt2influxdb(d):
+    json_data = create_influxdb_packet(d)
+    # print(json_data)
+    if simulate is False and json_data:
+        iclient.write_points(json_data)
+    return
 
 
 # List of macs of sensors which data will be collected
@@ -68,22 +89,39 @@ macs = []
 # get_data_for_sensors will look data for the duration of timeout_in_sec
 timeout_in_sec = 2
 
-import os
 
-def main(simulate=False):
-
+def main(args):
     while True:
-        if simulate:
+        if args.simulate:
             time.sleep(timeout_in_sec)
             datas = EXAMPLE_DATA
         else:
             datas = RuuviTagSensor.get_data_for_sensors(macs, timeout_in_sec)
-        send_data2influxdb(datas, simulate=simulate)
-        # print(json.dumps(datas, indent=1))
+        if args.protocol == 'http':
+            http_post2influxdb(datas, simulate=simulate)
+        elif args.protocol == 'mqtt':
+            json_data = create_influxdb_packet(datas)
+            mclient.publish(args.topic, payload=json.dumps(json_data), qos=0, retain=False)
+        else:
+            if args.quiet is False:
+                print("Not sending because protocol is not defined")
+        if args.verbose > 0:
+            print(json.dumps(datas, indent=1))
         continue
 
+"""
+"""
 
 if __name__ == '__main__':
+    # Parse arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-q', '--quiet', action='store_true', help='Never print a char (except on crash)')
+    parser.add_argument('-v', '--verbose', action='count', default=0, help='Print some informative messages')
+    parser.add_argument('-p', '--protocol', choices=['mqtt', 'http'], help='Use MQTT or HTTP to send data. No data will be sent if protocol is not defined')
+    parser.add_argument('-s', '--simulate', action='store_true', help='Simulate Ruuvitags, do not really scan')
+    args = parser.parse_args()
+    iclient = None
+    mclient = None
     if len(sys.argv) > 1 and sys.argv[1] == 's':
         simulate = True
         iclient = None
@@ -92,7 +130,15 @@ if __name__ == '__main__':
         dir_path = os.path.dirname(os.path.realpath(__file__))
         config.read(os.path.join(dir_path, 'config.ini'))
         timeout_in_sec = float(config['DEFAULT']['timeout'])
-        # print(config.sections())
         simulate = False
-        iclient = get_iclient(config['influxdb']['host'], int(config['influxdb']['port']), config['influxdb']['db'])
-    main(simulate=simulate)
+        if args.protocol:
+            if args.protocol.lower() == 'http':
+                iclient = get_iclient(config['influxdb']['host'], int(config['influxdb']['port']), config['influxdb']['db'])
+            if args.protocol.lower() == 'mqtt':
+                mclient = mqtt.Client()
+                mclient.username_pw_set(config['mqtt']['username'], config['mqtt']['password'])
+                mclient.on_connect = on_connect
+                # mclient.on_message = on_message
+                mclient.connect(config['mqtt']['host'], int(config['mqtt']['port']), 60)
+                args.topic = 'vv/fubar'
+    main(args)

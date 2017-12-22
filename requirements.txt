@@ -1,2 +1,3 @@
 influxdb
 ruuvitag-sensor
+paho-mqtt
