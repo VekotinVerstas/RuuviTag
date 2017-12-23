@@ -10,5 +10,12 @@ db = ruuvitag
 host = mqtt.example.org
 port = 1883
 topic = ruuvi/tags
-username = user
+username = readwrite_user
+password = pass
+
+[mqtt2influx]
+host = mqtt.example.org
+port = 1883
+topic = ruuvi/tags/#
+username = read_user
 password = pass
