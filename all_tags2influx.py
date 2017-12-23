@@ -140,5 +140,5 @@ if __name__ == '__main__':
                 mclient.on_connect = on_connect
                 # mclient.on_message = on_message
                 mclient.connect(config['mqtt']['host'], int(config['mqtt']['port']), 60)
-                args.topic = 'vv/fubar'
+                args.topic = config['mqtt']['topic']
     main(args)

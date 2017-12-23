@@ -5,3 +5,10 @@ timeout = 4
 host = 127.0.0.1
 port = 8086
 db = ruuvitag
+
+[mqtt]
+host = mqtt.example.org
+port = 1883
+topic = ruuvi/tags
+username = user
+password = pass
