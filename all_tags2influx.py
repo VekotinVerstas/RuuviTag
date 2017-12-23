@@ -99,9 +99,14 @@ def main(args):
             datas = RuuviTagSensor.get_data_for_sensors(macs, timeout_in_sec)
         if args.protocol == 'http':
             http_post2influxdb(datas, simulate=simulate)
+            if args.verbose > 1:
+                print('POSTing data "{}"'.format(json.dumps(datas)))
         elif args.protocol == 'mqtt':
             json_data = create_influxdb_packet(datas)
-            mclient.publish(args.topic, payload=json.dumps(json_data), qos=0, retain=False)
+            pl = json.dumps(json_data)
+            if args.verbose > 1:
+                print('Publish MQTT message {}  on topic {}'.format(pl, args.topic))
+            mclient.publish(args.topic, payload=pl, qos=0, retain=False)
         else:
             if args.quiet is False:
                 print("Not sending because protocol is not defined")
@@ -109,8 +114,7 @@ def main(args):
             print(json.dumps(datas, indent=1))
         continue
 
-"""
-"""
+
 
 if __name__ == '__main__':
     # Parse arguments
@@ -122,23 +126,23 @@ if __name__ == '__main__':
     args = parser.parse_args()
     iclient = None
     mclient = None
-    if len(sys.argv) > 1 and sys.argv[1] == 's':
-        simulate = True
-        iclient = None
-    else:
-        config = configparser.ConfigParser()
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        config.read(os.path.join(dir_path, 'config.ini'))
-        timeout_in_sec = float(config['DEFAULT']['timeout'])
-        simulate = False
-        if args.protocol:
-            if args.protocol.lower() == 'http':
-                iclient = get_iclient(config['influxdb']['host'], int(config['influxdb']['port']), config['influxdb']['db'])
-            if args.protocol.lower() == 'mqtt':
-                mclient = mqtt.Client()
-                mclient.username_pw_set(config['mqtt']['username'], config['mqtt']['password'])
-                mclient.on_connect = on_connect
-                # mclient.on_message = on_message
-                mclient.connect(config['mqtt']['host'], int(config['mqtt']['port']), 60)
-                args.topic = config['mqtt']['topic']
-    main(args)
+    config = configparser.ConfigParser()
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    config.read(os.path.join(dir_path, 'config.ini'))
+    timeout_in_sec = float(config['DEFAULT']['timeout'])
+    if args.protocol:
+        if args.protocol.lower() == 'http':
+            iclient = get_iclient(config['influxdb']['host'], int(config['influxdb']['port']),
+                                  config['influxdb']['db'])
+        if args.protocol.lower() == 'mqtt':
+            mclient = mqtt.Client()
+            mclient.username_pw_set(config['mqtt']['username'], config['mqtt']['password'])
+            mclient.on_connect = on_connect
+            # mclient.on_message = on_message
+            mclient.connect(config['mqtt']['host'], int(config['mqtt']['port']), 60)
+            args.topic = config['mqtt']['topic']
+    try:
+        main(args)
+    except KeyboardInterrupt:
+        mclient.disconnect()
+        print("Good bye")
