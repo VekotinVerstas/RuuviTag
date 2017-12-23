@@ -106,7 +106,9 @@ def main(args):
             pl = json.dumps(json_data)
             if args.verbose > 1:
                 print('Publish MQTT message {}  on topic {}'.format(pl, args.topic))
-            mclient.publish(args.topic, payload=pl, qos=0, retain=False)
+            result, mid = mclient.publish(args.topic, payload=pl, qos=0, retain=False)
+            if args.quiet is False  and result != 0:
+                print('MQTT publish error! {}'.format(result))
         else:
             if args.quiet is False:
                 print("Not sending because protocol is not defined")
