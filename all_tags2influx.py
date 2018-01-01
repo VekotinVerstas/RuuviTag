@@ -98,7 +98,7 @@ def main(args):
         else:
             datas = RuuviTagSensor.get_data_for_sensors(macs, timeout_in_sec)
         if args.protocol == 'http':
-            http_post2influxdb(datas, simulate=simulate)
+            http_post2influxdb(datas, simulate=args.simulate)
             if args.verbose > 1:
                 print('POSTing data "{}"'.format(json.dumps(datas)))
         elif args.protocol == 'mqtt':
