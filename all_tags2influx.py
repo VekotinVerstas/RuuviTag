@@ -96,7 +96,11 @@ def main(args):
             time.sleep(timeout_in_sec)
             datas = EXAMPLE_DATA
         else:
-            datas = RuuviTagSensor.get_data_for_sensors(macs, timeout_in_sec)
+            try:
+                datas = RuuviTagSensor.get_data_for_sensors(macs, timeout_in_sec)
+            except Exception as err:
+                print('ERROR at {}'.format(datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%fZ")))
+                print('{}'.format(err))
         if args.protocol == 'http':
             http_post2influxdb(datas, simulate=args.simulate)
             if args.verbose > 1:
